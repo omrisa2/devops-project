@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Response, status
+from fastapi import FastAPI, HTTPException, Response, status
 
 from app import storage
 from app.models import Book, BookIn
@@ -21,3 +21,11 @@ async def create_book(data: BookIn, response: Response) -> Book:
 @app.get("/books")
 async def list_books() -> list[Book]:
     return storage.list_all()
+
+
+@app.get("/books/{book_id}")
+async def read_book(book_id: int) -> Book:
+    book = storage.get(book_id)
+    if book is None:
+        raise HTTPException(status_code=404, detail=f"no book with id {book_id}")
+    return book

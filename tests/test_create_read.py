@@ -38,3 +38,16 @@ def test_list_books_oldest_first(client):
     response = client.get("/books")
     assert response.status_code == 200
     assert [book["title"] for book in response.json()] == ["Dune", "Emma"]
+
+
+def test_read_book(client):
+    client.post("/books", json=BOOK)
+    response = client.get("/books/1")
+    assert response.status_code == 200
+    assert response.json() == {"id": 1, **BOOK, "read": False}
+
+
+def test_read_missing_book_returns_404(client):
+    response = client.get("/books/7")
+    assert response.status_code == 404
+    assert response.json() == {"detail": "no book with id 7"}
