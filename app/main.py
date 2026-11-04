@@ -29,3 +29,11 @@ async def read_book(book_id: int) -> Book:
     if book is None:
         raise HTTPException(status_code=404, detail=f"no book with id {book_id}")
     return book
+
+
+@app.put("/books/{book_id}")
+async def replace_book(book_id: int, data: BookIn) -> Book:
+    book = storage.replace(book_id, data)
+    if book is None:
+        raise HTTPException(status_code=404, detail=f"no book with id {book_id}")
+    return book
