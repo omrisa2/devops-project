@@ -39,3 +39,25 @@ def test_replace_book_with_wrong_type_returns_422(client):
     client.post("/books", json=BOOK)
     response = client.put("/books/1", json={**BOOK, "year": "1965"})
     assert response.status_code == 422
+
+
+def test_delete_book(client):
+    client.post("/books", json=BOOK)
+    response = client.delete("/books/1")
+    assert response.status_code == 204
+    assert response.content == b""
+    assert client.get("/books/1").status_code == 404
+
+
+def test_delete_missing_book_returns_404(client):
+    response = client.delete("/books/7")
+    assert response.status_code == 404
+    assert response.json() == {"detail": "no book with id 7"}
+
+
+def test_deleted_id_is_never_reused(client):
+    client.post("/books", json=BOOK)
+    client.post("/books", json=BOOK)
+    client.delete("/books/2")
+    response = client.post("/books", json=BOOK)
+    assert response.json()["id"] == 3

@@ -37,3 +37,10 @@ async def replace_book(book_id: int, data: BookIn) -> Book:
     if book is None:
         raise HTTPException(status_code=404, detail=f"no book with id {book_id}")
     return book
+
+
+@app.delete("/books/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_book(book_id: int) -> Response:
+    if not storage.delete(book_id):
+        raise HTTPException(status_code=404, detail=f"no book with id {book_id}")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
