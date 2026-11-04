@@ -16,3 +16,8 @@ async def create_book(data: BookIn, response: Response) -> Book:
     book = storage.add(data)
     response.headers["Location"] = f"/books/{book.id}"
     return book
+
+
+@app.get("/books")
+async def list_books() -> list[Book]:
+    return storage.list_all()
