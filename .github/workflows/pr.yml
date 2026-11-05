@@ -1,0 +1,34 @@
+name: Pull request
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "lint - Task 7 runs ruff here"
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "unit-tests - Task 7 runs pytest here"
+
+  image-build:
+    needs: [lint, unit-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "image-build - Task 4 builds the image here"
+
+  integration-tests:
+    needs: image-build
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "integration-tests - Task 8 runs the image against a database here"
+
+  security:
+    needs: image-build
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "security - Task 9 scans the code and the image here"
