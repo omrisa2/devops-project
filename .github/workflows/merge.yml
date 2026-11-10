@@ -7,14 +7,31 @@ on:
 jobs:
   image-push:
     runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.push.outputs.image }}
     steps:
-      - run: echo "image-push - Task 4 builds the image and pushes it here"
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      - name: Log in to Docker Hub with the stored token
+        uses: docker/login-action@v4
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build, tag with the commit SHA, and push
+        id: push
+        run: |
+          IMAGE="docker.io/${{ vars.DOCKERHUB_USERNAME }}/devops-project:${GITHUB_SHA}"
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
 
   deploy:
     needs: image-push
     runs-on: ubuntu-latest
     steps:
-      - run: echo "deploy - Task 6 deploys the image here"
+      - run: echo "deploy - Task 6 deploys ${{ needs.image-push.outputs.image }} here"
 
   smoke-test:
     needs: deploy
