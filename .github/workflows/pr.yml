@@ -19,7 +19,11 @@ jobs:
     needs: [lint, unit-tests]
     runs-on: ubuntu-latest
     steps:
-      - run: echo "image-build - Task 4 builds the image here"
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      - name: Build the image, no login and no push
+        run: docker build -t devops-project:pr .
 
   integration-tests:
     needs: image-build
