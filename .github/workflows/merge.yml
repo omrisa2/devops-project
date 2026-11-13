@@ -30,7 +30,28 @@ jobs:
   deploy:
     needs: image-push
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # lets this job ask GitHub for an ID token
     steps:
+      - name: Show the ID token's claims (what AWS checks)
+        run: |
+          TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -r .value)
+          echo "::add-mask::$TOKEN"
+          PAYLOAD=$(echo "$TOKEN" | cut -d. -f2 | tr '_-' '/+')
+          while [ $(( ${#PAYLOAD} % 4 )) -ne 0 ]; do PAYLOAD="$PAYLOAD="; done
+          echo "$PAYLOAD" | base64 -d | jq '{iss, aud, sub, repository, ref, iat, exp}'
+
+      - name: Trade GitHub's ID token for AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Ask AWS who the job is
+        run: aws sts get-caller-identity
+
       - run: echo "deploy - Task 6 deploys ${{ needs.image-push.outputs.image }} here"
 
   smoke-test:
