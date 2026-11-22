@@ -33,7 +33,12 @@ jobs:
     permissions:
       contents: read
       id-token: write # lets this job ask GitHub for an ID token
+    outputs:
+      url: ${{ steps.url.outputs.url }}
     steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
       - name: Show the ID token's claims (what AWS checks)
         run: |
           TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
@@ -52,10 +57,79 @@ jobs:
       - name: Ask AWS who the job is
         run: aws sts get-caller-identity
 
-      - run: echo "deploy - Task 6 deploys ${{ needs.image-push.outputs.image }} here"
+      - name: Point kubectl at the cluster
+        run: aws eks update-kubeconfig --name "${{ vars.EKS_CLUSTER }}" --region "${{ vars.AWS_REGION }}"
+
+      - name: Ask Kubernetes who the job is
+        run: |
+          kubectl version --client
+          kubectl auth whoami
+
+      - name: Set the image tag to this commit
+        working-directory: deploy
+        run: |
+          kustomize version
+          kustomize edit set image "docker.io/${{ vars.DOCKERHUB_USERNAME }}/devops-project=${{ needs.image-push.outputs.image }}"
+          cat kustomization.yaml
+
+      - name: Apply the manifests
+        run: kubectl apply -k deploy/
+
+      - name: Wait for the rollout
+        run: |
+          kubectl rollout status deployment/db -n web --timeout=180s
+          kubectl rollout status deployment/devops-project -n web --timeout=180s
+
+      - name: Get the load balancer's address
+        id: url
+        run: |
+          for i in $(seq 1 30); do
+            HOST=$(kubectl get service devops-project -n web \
+              -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            if [ -n "$HOST" ]; then break; fi
+            echo "no address yet ($i/30), waiting 10s"
+            sleep 10
+          done
+          if [ -z "$HOST" ]; then echo "the load balancer got no address"; exit 1; fi
+          echo "url=http://$HOST" >> "$GITHUB_OUTPUT"
+          echo "App URL: http://$HOST" >> "$GITHUB_STEP_SUMMARY"
 
   smoke-test:
     needs: deploy
     runs-on: ubuntu-latest
+    env:
+      URL: ${{ needs.deploy.outputs.url }}
     steps:
-      - run: echo "smoke-test - Task 6 calls the deployed app here"
+      - name: Wait until /healthz answers
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS "$URL/healthz"; then echo; exit 0; fi
+            echo "not answering yet ($i/30), waiting 10s"
+            sleep 10
+          done
+          echo "/healthz did not answer within 5 minutes"
+          exit 1
+
+      - name: Create, read, and delete one book
+        run: |
+          STATUS=$(curl -sS -o created.json -w '%{http_code}' -X POST "$URL/books" \
+            -H "Content-Type: application/json" \
+            -d '{"title": "Smoke Test", "author": "Pipeline"}')
+          echo "POST /books -> $STATUS"
+          cat created.json; echo
+          if [ "$STATUS" != 201 ]; then exit 1; fi
+          ID=$(jq -r .id created.json)
+
+          for i in 1 2 3 4 5; do
+            STATUS=$(curl -sS -o /dev/null -w '%{http_code}' "$URL/books/$ID")
+            echo "GET /books/$ID (try $i) -> $STATUS"
+            if [ "$STATUS" != 200 ]; then exit 1; fi
+          done
+
+          STATUS=$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE "$URL/books/$ID")
+          echo "DELETE /books/$ID -> $STATUS"
+          if [ "$STATUS" != 204 ]; then exit 1; fi
+
+          STATUS=$(curl -sS -o /dev/null -w '%{http_code}' "$URL/books/$ID")
+          echo "GET /books/$ID after delete -> $STATUS"
+          if [ "$STATUS" != 404 ]; then exit 1; fi
