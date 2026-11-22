@@ -27,7 +27,7 @@ def list_books() -> list[Book]:
 def read_book(book_id: int) -> Book:
     book = storage.get(book_id)
     if book is None:
-        raise HTTPException(status_code=404, detail=f"no book with id {book_id}")
+        raise HTTPException(status_code=404, detail=f"book {book_id} was not found")
     return book
 
 
@@ -35,12 +35,12 @@ def read_book(book_id: int) -> Book:
 def replace_book(book_id: int, data: BookIn) -> Book:
     book = storage.replace(book_id, data)
     if book is None:
-        raise HTTPException(status_code=404, detail=f"no book with id {book_id}")
+        raise HTTPException(status_code=404, detail=f"book {book_id} was not found")
     return book
 
 
 @app.delete("/books/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_book(book_id: int) -> Response:
     if not storage.delete(book_id):
-        raise HTTPException(status_code=404, detail=f"no book with id {book_id}")
+        raise HTTPException(status_code=404, detail=f"book {book_id} was not found")
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -50,4 +50,4 @@ def test_read_book(client):
 def test_read_missing_book_returns_404(client):
     response = client.get("/books/7")
     assert response.status_code == 404
-    assert response.json() == {"detail": "no book with id 7"}
+    assert response.json() == {"detail": "book 7 was not found"}

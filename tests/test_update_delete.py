@@ -32,7 +32,7 @@ def test_replace_book_ignores_id_in_body(client):
 def test_replace_missing_book_returns_404(client):
     response = client.put("/books/7", json=BOOK)
     assert response.status_code == 404
-    assert response.json() == {"detail": "no book with id 7"}
+    assert response.json() == {"detail": "book 7 was not found"}
 
 
 def test_replace_book_with_wrong_type_returns_422(client):
@@ -52,7 +52,7 @@ def test_delete_book(client):
 def test_delete_missing_book_returns_404(client):
     response = client.delete("/books/7")
     assert response.status_code == 404
-    assert response.json() == {"detail": "no book with id 7"}
+    assert response.json() == {"detail": "book 7 was not found"}
 
 
 def test_deleted_id_is_never_reused(client):
