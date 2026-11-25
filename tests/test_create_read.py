@@ -1,3 +1,5 @@
+from datetime import date
+
 BOOK = {"title": "Dune", "author": "Frank Herbert", "year": 1965}
 
 
@@ -12,6 +14,15 @@ def test_create_book_with_invalid_field_returns_422(client):
     response = client.post("/books", json={"title": "", "author": "Frank Herbert"})
     assert response.status_code == 422
     assert "detail" in response.json()
+
+
+def test_create_book_with_future_year_returns_422(client):
+    next_year = date.today().year + 1
+    response = client.post(
+        "/books", json={"title": "Later", "author": "Someone", "year": next_year}
+    )
+    assert response.status_code == 422
+    assert client.get("/books").json() == []
 
 
 def test_create_book_with_body_not_json_returns_422(client):
