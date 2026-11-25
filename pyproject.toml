@@ -1,0 +1,19 @@
+# Settings for the tools that check the code. The app itself does not read this file.
+
+[tool.ruff]
+target-version = "py313"  # the oldest Python in the CI matrix
+
+[tool.mypy]
+files = ["app"]           # plain "mypy" checks app/
+python_version = "3.13"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]        # plain "pytest" finds the app package
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["app"]          # measure our code, not the tests
+
+[tool.coverage.report]
+fail_under = 75           # fail the run below 75% (measured 78% on 25.11)
+show_missing = true       # list the lines no test ran
