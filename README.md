@@ -28,9 +28,21 @@ Storage is in memory for now.
 
 The interactive API docs are at http://127.0.0.1:8000/docs
 
-## Run the tests
+## Run the tests and the checks
 
-    pytest
+    pytest --cov            # the unit tests; fails below 75% coverage
+    ruff check .            # lint
+    ruff format --check .   # formatting
+    mypy                    # types
+
+The settings are in `pyproject.toml`. The same checks run on every push
+(`branch.yml`) and on every pull request (`pr.yml`), on Python 3.13 and 3.14.
+
+To run them before each commit, once after cloning:
+
+    pre-commit install
+
+From then on, a failing check stops `git commit`.
 
 ## The pipeline
 
