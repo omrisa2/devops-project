@@ -67,11 +67,83 @@ jobs:
       - name: Build the image, no login and no push
         run: docker build -t devops-project:pr .
 
+      - name: Save the image to a file
+        run: docker save -o image.tar devops-project:pr
+
+      - name: Upload the image file for the next jobs
+        uses: actions/upload-artifact@v7
+        with:
+          name: image
+          path: image.tar
+          retention-days: 1
+          if-no-files-found: error
+
   integration-tests:
     needs: image-build
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: books
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: books
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U books"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
-      - run: echo "integration-tests - Task 8 runs the image against a database here"
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      - name: Download the image file from image-build
+        uses: actions/download-artifact@v8
+        with:
+          name: image
+
+      - name: Load the image into Docker
+        run: docker load -i image.tar
+
+      - name: Start the app on the runner's network, with the database
+        run: >-
+          docker run -d --name app --network host
+          -e DATABASE_URL=postgresql://books:ci-only-password@localhost:5432/books
+          devops-project:pr
+
+      - name: Wait until the app answers /healthz
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/healthz; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "The app did not answer /healthz within 60 seconds"
+          exit 1
+
+      - name: Set up Python, with a cache for pip downloads
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install the test tools
+        run: pip install -r requirements-dev.txt
+
+      - name: Run the integration tests over HTTP
+        run: pytest integration -v
+        env:
+          BASE_URL: http://localhost:8000
+
+      - name: Show the app logs if a step failed
+        if: failure()
+        run: docker logs app
 
   security:
     needs: image-build
