@@ -44,6 +44,23 @@ To run them before each commit, once after cloning:
 
 From then on, a failing check stops `git commit`.
 
+## Run the integration tests
+
+The tests in `integration/` call a running app over HTTP, with PostgreSQL behind it.
+Plain `pytest` does not collect them. To run them locally:
+
+    docker build -t devops-project:pr .
+    docker run -d --name it-db -e POSTGRES_USER=books -e POSTGRES_PASSWORD=local \
+        -e POSTGRES_DB=books -p 5432:5432 postgres:18
+    until docker exec it-db pg_isready -U books; do sleep 1; done
+    docker run -d --name it-app --network host \
+        -e DATABASE_URL=postgresql://books:local@localhost:5432/books devops-project:pr
+    pytest integration -v
+    docker rm -f it-app it-db
+
+`BASE_URL` points the tests at another address (default `http://localhost:8000`).
+On a pull request, `integration-tests` runs them against the image from `image-build`.
+
 ## The pipeline
 
 | Workflow    | Runs on                          | Jobs                                                     |
@@ -52,4 +69,5 @@ From then on, a failing check stops `git commit`.
 | `pr.yml`    | a pull request to `main`         | lint, unit-tests → image-build → integration-tests, security |
 | `merge.yml` | a merge into `main`              | image-push → deploy → smoke-test                         |
 
-`main` is protected: every change reaches it through a pull request with an approval.
+`main` is protected: every change reaches it through a pull request with an approval,
+and the pull request checks (lint, unit-tests, image-build, integration-tests) must pass.
